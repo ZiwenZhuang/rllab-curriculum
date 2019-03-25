@@ -1,25 +1,27 @@
-# rllab-curriculum
+# rllab-learn2learn
 
-This codebase is self-contained to reproduce the results in:
-- [Carlos Florensa, David Held, Xinyang Geng, Pieter Abbeel. *Automatic Goal Generation for Reinforcement Learning Agents*. In Proceedings of the 35th International Conference on Machine Learning (ICML) 2018](http://proceedings.mlr.press/v80/florensa18a.html).
-- [Carlos Florensa, David Held, Markus Wulfmeier, Michael Zhang, Pieter Abbeel. *Reverse Curriculum Generation for Reinforcement Learning*. In Conference on Robot Learning (CoRL) 2017](http://proceedings.mlr.press/v78/florensa17a.html).
+This repo is forked from https://github.com/florensacc/rllab-curriculum which possibly from rllab.
 
-To setup `rllab`, please see documentation at [https://rllab.readthedocs.org/en/latest/](https://rllab.readthedocs.org/en/latest/).
+## Installation
 
-## Goal Generation
-To run the maze-ant goal experiments, run:
+We have only installed it through anaconda, which is the only way we could provide. Unfortunately, the initial `rllab` is deprecated. And for the safety and easy to locate problem while installing, please install `mujoco-py` manually in the virtual environment.
 
-`python curriculum/experiments/goals/maze_ant/maze_ant_gan.py`
+```bash
+cd path/to/rllab-learn2learn
+conda env create -f environment.yml
 
-In the same directory are all the files to lauch all the baselines presented in the [*Automatic Goal Generation for RL Agents*](http://proceedings.mlr.press/v80/florensa18a.html) paper, and more. The performances obtained should match the figure found in 
+# manually install mujoco-py in the virtual environment
+```
 
-`data/Figures/maze_ant/maze_ant_baselines_long.png`
+### Error & Solution
 
-## Reverse Curriculum
-To run the key-hole manipulation experiments, run:
+- If you are going to use mujoco environment, which is commercial, you need to acquire a key and install it. (please notice the mujoco version needed by mujoco-py)
+- If you see `file not found` error with `patchelf` prompted, please install it manually with `sudo apt install patchelf`
+- If you get error on incompatible ipython dependency, please manually upgrade ipython via pip. (in the virtual environment)
+- If you see other dependencies that are not solved by conda itself, just install the version that meets the requirement. (there should not be too much)
 
-`python curriculum/experiments/starts/arm3d/arm3d_key/arm3d_key_brownian.py`
+You can read more to setup `rllab` and see documentation at [https://rllab.readthedocs.org/en/latest/](https://rllab.readthedocs.org/en/latest/).
 
-In the same directory are all the files to lauch all the baselines presented in the [*Reverse Curriculum Generation for RL*](http://proceedings.mlr.press/v78/florensa17a.html) paper, and more. The performances obtained should match the figure found in 
+## Changes
 
-`data/Figures/arm3d-key/main.png`
+All experiments code are at `learn2learn` directory. Other from that, they are inherited from upstream.

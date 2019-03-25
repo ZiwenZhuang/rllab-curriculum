@@ -1,4 +1,4 @@
-name: rllab_goal_rl
+name: learn-everything
 channels:
     - https://conda.anaconda.org/kne
     - https://conda.binstar.org/tlatorre
@@ -7,24 +7,25 @@ channels:
     - jjhelmus
     - soumith
 dependencies:
-    - python==3.5.2
-    - numpy==1.11.2
+    - python==3.5
+    - numpy
     - scipy
     - path.py
     - python-dateutil
-    - joblib==0.9.4
+    - joblib
     - mako
     - ipywidgets
     - numba
     - flask
-    - pybox2d
-    - pygame
     - h5py
     - matplotlib
-    - opencv3=3.1.0
+    - opencv3
     - scikit-learn
     - pytorch
     - torchvision
+    - Cython
+    - pybox2d
+    - pygame
     - pip:
         - Pillow
         - atari-py
@@ -35,11 +36,9 @@ dependencies:
         - nose2
         - pyzmq
         - msgpack-python
-        - mujoco_py
         - cached_property
         - line_profiler
         - cloudpickle
-        - Cython
         - redis
         - git+https://github.com/Theano/Theano.git@adfe319ce6b781083d8dc3200fb4481b00853791#egg=Theano
         - git+https://github.com/neocxi/Lasagne.git@484866cf8b38d878e92d521be445968531646bb8#egg=Lasagne
@@ -50,7 +49,7 @@ dependencies:
         - git+https://github.com/neocxi/prettytensor.git
         - jupyter
         - progressbar2
-        - chainer==1.18.0
+        - chainer
         - tensorflow-gpu; 'linux' in sys_platform
         - tensorflow; sys_platform == 'darwin'
         - dominate

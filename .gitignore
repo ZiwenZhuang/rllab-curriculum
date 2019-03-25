@@ -64,3 +64,6 @@ sandbox/rocky/motor
 *.egg-info
 
 temp/
+
+# vscode
+.vscode/
