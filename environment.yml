@@ -1,4 +1,4 @@
-name: learn-everything
+name: rllab-learn2learn
 channels:
     - https://conda.anaconda.org/kne
     - https://conda.binstar.org/tlatorre
@@ -26,6 +26,7 @@ dependencies:
     - Cython
     - pybox2d
     - pygame
+    - tensorflow-gpu
     - pip:
         - Pillow
         - atari-py
@@ -50,8 +51,6 @@ dependencies:
         - jupyter
         - progressbar2
         - chainer
-        - tensorflow-gpu; 'linux' in sys_platform
-        - tensorflow; sys_platform == 'darwin'
         - dominate
         - scikit-image
         - git+https://github.com/tflearn/tflearn.git
