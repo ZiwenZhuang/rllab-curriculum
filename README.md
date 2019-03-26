@@ -11,10 +11,12 @@ cd path/to/rllab-learn2learn
 conda env create -f environment.yml
 
 # manually install mujoco-py in the virtual environment
+# manually upgrade tensorflow to meet the dependency requirement of tensorflow-probability
 ```
 
 ### Error & Solution
 
+- If you cannot use GPU version of tensorflow, please change `tensorflow-gpu` to `tensorlfow` in environment.yml
 - If you are going to use mujoco environment, which is commercial, you need to acquire a key and install it. (please notice the mujoco version needed by mujoco-py)
 - If you see `file not found` error with `patchelf` prompted, please install it manually with `sudo apt install patchelf`
 - If you get error on incompatible ipython dependency, please manually upgrade ipython via pip. (in the virtual environment)

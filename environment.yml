@@ -21,14 +21,16 @@ dependencies:
     - matplotlib
     - opencv3
     - scikit-learn
+    - Pillow
     - pytorch
     - torchvision
     - Cython
     - pybox2d
     - pygame
     - tensorflow-gpu
+    - tensorflow
     - pip:
-        - Pillow
+        - tensorflow-probability
         - atari-py
         - pyprind
         - ipdb
