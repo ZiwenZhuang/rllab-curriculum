@@ -3,7 +3,11 @@
 from rllab.envs.base import Env
 from rllab.envs.base import Step
 from rllab.spaces import Box
+from rllab.misc import logger
+
 import numpy as np
+import pickle
+import os
 
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -40,16 +44,22 @@ class PointEnv(Env):
 class LogisticEnv(Env):
     ''' Trying to learn to optimize logistic regression problem
     '''
-    def __init__(self, sess= None):
+    def __init__(self, sess= None, data_path= None, weights_path= None):
+        ''' Both paths are file path, not directory path. (they has to be pkl file stored previously)
+        '''
         # a dictionary specifying configurations
         # Don't put object in here
         self.configs = {
-            "num_data": 10,
-            # assuming the value is x, the number of parameters in w and d will be x^2 + x
+            # each type of eample will be drawn half of the total sample amount.
+            "num_data_total": 100,
+            # assuming the value is x, the number of parameters in w and d will be x + 1
             "x_dim": 3,
             "lambda": tf.constant(0.0005), # for l-2 regularization according to the paper
-            "sample_first": True, # whether to sample the x-s first.
+            "data_path": data_path, # load and save (X,Y) data
+            "weights_path": weights_path, # load and save learnt weights
         }
+
+        logger.log("Logistic regression environment initializing...")
         
         # data generator of 2 multivariate Gaussians
         # (zero-th one for y == 0, another for y == 1)
@@ -77,9 +87,44 @@ class LogisticEnv(Env):
                     (1 - self.vars["y"]) * tf.math.log(1 - self.vars["out"]))
             self.vars["loss"] = tf.reduce_mean(self.vars["losses"], 1) + self.configs["lambda"] / 2 * tf.norm(self.vars["w"], ord= 2)
 
-        # sample data from each distributions
-        if self.configs["sample_first"]:
+        # if nowhere to load the data, sample them
+        if self.configs["data_path"] is None or not os.path.isfile(self.configs["data_path"]):
+            # both of which will be concatencate into a matrix with (n) columns
+            X, Y = self._generate_data(self.configs["num_data_total"])
+            self.data = (X, Y)
+            logger.log("(X,Y) data generated.")
+            # check again whether to store the data
+            if isinstance(self.configs["data_path"], str):
+                pickle.dump(self.data)
+                logger.log("(X,Y) data stored at: %s" % self.configs["data_path"])
+        else:
+            with open(self.configs["data_path"]) as f:
+                self.data = pickle.load(f)
+                logger.log("(X,Y) data loaded at: %s" % self.configs["data_path"])
+
+        # initialize the weights
+        # TODO: provide method to load and store weights at certain frequencies.
+        self.sess.run([self.vars["w"].initializer, self.vars["b"].initializer])
+        logger.log("Logistic regression initialization done.")
             
+    def _generate_data(n):
+        ''' Generate 'n' number of data (with input and output) in total.
+            Each type of data is evenly generated in terms of amount.
+            return: (X, Y)
+                X: a (d by n) np array
+                Y: a (1 by n) np array
+        '''
+        X = []
+        Y = []
+        for i, dist in enumerate(self.distributions):
+            num = n // len(self.distributions)
+            X_data = self.sess.run(dist.sample(num)) # calculate the data
+            X.append(X_data.transpose()) # transpose the array, so that each column is a vector
+            Y.append(numpy.array([[i for _ in range(num)]]))
+        # concatencate each array into matrix.
+        X = np.concatenate(X, axis= 1)
+        Y = np.concatenate(Y, axis= 1)
+        return (X, Y)
         
     def _rand_Gaussian_Dist(self):
         ''' The method generate a multivariate gaussian distribution with 
@@ -88,6 +133,7 @@ class LogisticEnv(Env):
         '''
         mean = rand.uniform(shape= [self.configs["x_dim"]])
         covar = rand.uniform(shape= [self.configs["x_dim"], self.configs["x_dim"]], maxval= 1)
+        covar = numpy.dot(covar, covar.transpose()) #ensure that the random generated matrix is positive-semidefinite
 
         # generate the distribution
         return tfd.MultivariateNormalFullCovariance(
