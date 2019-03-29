@@ -43,6 +43,23 @@ class PointEnv(Env):
 
 class LogisticEnv(Env):
     ''' Trying to learn to optimize logistic regression problem
+
+          T
+     +---+   +-------------------+
+     |   |   |                   |
+     |   |   |                   |
+     |   |   |                   |
+     |   |   |                   |
+     |   |   |                   |       +----------------------+
+     | w |   |         X         |   +   |    b(broadcasted)    |
+     |   |   |                   |       +----------------------+
+     |   |   |                   |
+     |   |   |                   |
+     |   |   |                   |
+     |   |   |                   |
+     +---+   +-------------------+
+
+        where vectors are still stored as a 1-D array
     '''
     def __init__(self, sess= None, data_path= None, weights_path= None):
         ''' Both paths are file path, not directory path. (they has to be pkl file stored previously)
@@ -55,6 +72,8 @@ class LogisticEnv(Env):
             # assuming the value is x, the number of parameters in w and d will be x + 1
             "x_dim": 3,
             "lambda": tf.constant(0.0005), # for l-2 regularization according to the paper
+            # the H mentioned in the paper which is the length of the trajectory of hisotical information.
+            "horizon": 25,
             "data_path": data_path, # load and save (X,Y) data
             "weights_path": weights_path, # load and save learnt weights
         }
@@ -74,18 +93,19 @@ class LogisticEnv(Env):
         # setup formula
         self.vars = {}
         with tf.variable_scope("discriminator") as scope:
-            self.vars["w"] = tf.Variable(name= "w", shape= (self.configs["x_dim"],1))
-            self.vars["b"] = tf.Variable(name= "b", shape= (1,1))
+            self.vars["w"] = tf.get_variable(name= "w", shape= (self.configs["x_dim"],))
+            self.vars["b"] = tf.get_variable(name= "b", shape= (1,))
             # where 'None' indicates the number of data generated
             self.vars["x"] = tf.placeholder(tf.float32, shape= (self.configs["x_dim"], None), name= "x")
             self.vars["y"] = tf.placeholder(tf.float32, shape= (1, None), name= "y") # the true value
 
-            self.vars["out"] = tf.math.sigmoid((tf.matmul(w, x, transpose_a= True) + b), name= "logistic_out")
+            self.vars["out"] = tf.math.sigmoid((tf.matmul(tf.reshape(w, [1, self.configs["x_dim"]]), x, transpose_a= True) + b), name= "logistic_out")
 
         with tf.variable_scope("loss_func") as scope:
             self.vars["losses"] = (self.vars["y"] * tf.math.log(self.vars["out"]) + \
                     (1 - self.vars["y"]) * tf.math.log(1 - self.vars["out"]))
-            self.vars["loss"] = tf.reduce_mean(self.vars["losses"], 1) + self.configs["lambda"] / 2 * tf.norm(self.vars["w"], ord= 2)
+            self.vars["loss"] = tf.reduce_mean(self.vars["losses"], 1) + self.configs["lambda"] / 2 * tf.norm(self.vars["w"])
+            self.vars["gradients"] = tf.gradients(self.vars["loss"], [self.vars["w"], self.vars["b"]])
 
         # if nowhere to load the data, sample them
         if self.configs["data_path"] is None or not os.path.isfile(self.configs["data_path"]):
@@ -102,9 +122,9 @@ class LogisticEnv(Env):
                 self.data = pickle.load(f)
                 logger.log("(X,Y) data loaded at: %s" % self.configs["data_path"])
 
-        # initialize the weights
-        # TODO: provide method to load and store weights at certain frequencies.
-        self.sess.run([self.vars["w"].initializer, self.vars["b"].initializer])
+        # reset/initialize the environment
+        self.reset()
+
         logger.log("Logistic regression initialization done.")
             
     def _generate_data(n):
@@ -143,6 +163,95 @@ class LogisticEnv(Env):
 
     @property
     def observation_space(self):
-        # the weights of thelogistics objective equation
-        
+        ''' calculate the total dimension of the state space
+        '''
 
+        # (assuming the current iterate mentioned is weight + b)
+        parm_dim = self.configs["x_dim"] + 1
+        # previous 'horizon' number of objective values
+        obj_vals_changes = self.configs["horizon"] * 1
+        # previous 'horizon' number of gradient of all weights and bias
+        # the gradients in each iteration are packed together
+        grads = self.configs["horizon"] * (self.configs["x_dim"] + 1)
+
+        total_dim = parm_dim + obj_values + grads
+        return Box(low= -np.inf, high= np.inf, shape= (total_dim,))
+
+    @property
+    def action_space(self):
+        ''' Action is a vector that added to all weights and bias to 
+            tune the parameters.
+            (weight, bias)
+        '''
+        return Box(low= -np.inf, high= np.inf, shape= (self.configs["x_dim"] + 1))
+
+    def reset(self):
+        ''' Randomly initializing problem parameters and clear history trajectories.
+        '''
+
+        # initialize the weights
+        # TODO: provide method to load and store weights at certain frequencies.
+        self.sess.run([self.vars["w"].initializer, self.vars["b"].initializer])
+
+        # according to the paper setting, add history objective value and history gradient as state space
+        # This is the only place to construct a trajectory dictionary and add fields
+        self.trajectory = {}
+        self.trajectory["obj_vals_changes"] = [np.zeros(1) for _ in range(self.configs["horizon"])]
+        self.trajectory["gradient_history"] = [np.zeros((self.configs["x_dim"]+1)) for _ in range(self.configs["horizon"])]
+
+        # calculate the gradient of 'w' and 'b' w.r.t the total loss
+        feed_dict = {self.vars["x"]: self.data[0], self.vars["y"]: self.data[1]}
+        w, b, self.trajectory["curr_grads"], self.trajectory["curr_loss"] = self.sess.run([
+                self.vars["w"],
+                self.vars["b"],
+                self.vars["gradients"],
+                self.vars["loss"]], feed_dict= feed_dict)
+        w_grad = self.gradients[0] # just for notice
+        b_grad = self.gradients[1]
+
+        # pack the observation an concatencate into numpy array
+        to_cat = [w, b] + self.trajectory["obj_vals_changes"] + self.trajectory["gradient_history"]
+        observation = np.concatenate(to_cat, axis= 0)
+
+        return observation
+
+    def step(self, action):
+        ''' Take in the parameter changes (w, b), where 'b' changes should be the last one.
+        '''
+        self.sess.run([
+            self.vars["w"].assign_add(action[:-1]), \
+            self.vars["b"].assign_add(action[-1]) \
+        ])
+
+        # get new state
+        feed_dict = {self.vars["x"]: self.data[0], self.vars["y"]: self.data[1]}
+        w, b, gradients, loss = self.sess.run([
+                self.vars["w"],
+                self.vars["b"],
+                self.vars["gradients"],
+                self.vars["loss"]], feed_dict= feed_dict)
+        # update history
+        self.trajectory["obj_vals_changes"].append(loss - self.trajectory["curr_loss"])
+        self.trajectory["obj_vals_chages"].pop(0)
+        self.trajectory["curr_loss"] = loss
+        self.trajectory["gradient_history"].append(np.concatenate(gradients))
+        self.trajectory["gradient_history"].pop(0)
+        self.trajectory["curr_grads"] = gradients
+
+        # pack the observation and concatencate into numpy array
+        to_cat = [w, b] + self.trajectory["obj_vals_changes"] + self.trajectory["gradient_history"]
+        observation = np.concatenate(to_cat, axis= 0)
+
+        # calculate the reward
+        reward = -loss
+
+        # determine if the environment is done
+        done = False
+        if done: # TODO
+            self.reset()
+
+        # pack some info
+        info = {}
+
+        # pack as Step object and return
+        return Step(observation, reward, done, info)
